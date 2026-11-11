@@ -1,0 +1,194 @@
+openapi: 3.0.3
+info:
+  title: Inditex E-Commerce Price Service API
+  description: |
+    Microservice REST API for querying applicable product prices based on brand,
+    product identifier, and application date, applying priority disambiguation
+    rules when multiple tariffs overlap in time.
+  version: 1.0.0
+  contact:
+    name: Inditex E-Commerce Architecture Team
+    email: ecommerce-architecture@inditex.com
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: http://localhost:8080
+    description: Local development / Docker environment
+
+tags:
+  - name: Prices
+    description: Operations related to product pricing and tariff lookups
+
+paths:
+  /api/v1/prices:
+    get:
+      tags:
+        - Prices
+      summary: Get applicable price for a product and brand at a given date
+      description: |
+        Retrieves the applicable price for a specified brand and product at a given date and time.
+        If multiple tariffs coincide in the date range, the tariff with the highest numerical
+        priority is selected.
+      operationId: getApplicablePrice
+      parameters:
+        - name: applicationDate
+          in: query
+          description: Application date and time in ISO-8601 format (e.g., 2020-06-14T10:00:00)
+          required: true
+          schema:
+            type: string
+            format: date-time
+          example: "2020-06-14T10:00:00"
+        - name: productId
+          in: query
+          description: Unique product identifier
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+          example: 35455
+        - name: brandId
+          in: query
+          description: Chain/Brand group identifier (1 = ZARA)
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+          example: 1
+      responses:
+        '200':
+          description: Applicable price found successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PriceResponse'
+              examples:
+                samplePrice:
+                  summary: Test 1 sample response
+                  value:
+                    productId: 35455
+                    brandId: 1
+                    priceList: 1
+                    startDate: "2020-06-14T00:00:00"
+                    endDate: "2020-12-31T23:59:59"
+                    price: 35.50
+                    currency: "EUR"
+        '400':
+          description: Bad request - Missing or invalid query parameters
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              examples:
+                validationError:
+                  summary: Missing parameter error
+                  value:
+                    type: "about:blank"
+                    title: "Bad Request"
+                    status: 400
+                    detail: "Required parameter 'productId' is not present."
+                    instance: "/api/v1/prices"
+        '404':
+          description: Not found - No matching price tariff found for given criteria
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              examples:
+                notFoundError:
+                  summary: Price not found error
+                  value:
+                    type: "https://api.inditex.com/errors/price-not-found"
+                    title: "Price Not Found"
+                    status: 404
+                    detail: "No price found for brand 1, product 99999 at 2020-06-14T10:00:00"
+                    instance: "/api/v1/prices"
+        '500':
+          description: Internal server error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+components:
+  schemas:
+    PriceResponse:
+      type: object
+      required:
+        - productId
+        - brandId
+        - priceList
+        - startDate
+        - endDate
+        - price
+        - currency
+      properties:
+        productId:
+          type: integer
+          format: int64
+          description: Product identifier
+          example: 35455
+        brandId:
+          type: integer
+          format: int64
+          description: Brand/Chain identifier (1 = ZARA)
+          example: 1
+        priceList:
+          type: integer
+          format: int32
+          description: Applicable price tariff identifier
+          example: 1
+        startDate:
+          type: string
+          format: date-time
+          description: Start timestamp of the applicable price tariff
+          example: "2020-06-14T00:00:00"
+        endDate:
+          type: string
+          format: date-time
+          description: End timestamp of the applicable price tariff
+          example: "2020-12-31T23:59:59"
+        price:
+          type: number
+          format: double
+          description: Final commercial price
+          example: 35.50
+        currency:
+          type: string
+          description: ISO 4217 three-letter currency code
+          example: "EUR"
+
+    ProblemDetail:
+      type: object
+      description: RFC 9457 standard problem detail structure
+      required:
+        - status
+        - title
+      properties:
+        type:
+          type: string
+          format: uri
+          description: A URI reference identifying the problem type
+          example: "about:blank"
+        title:
+          type: string
+          description: A short, human-readable summary of the problem type
+          example: "Bad Request"
+        status:
+          type: integer
+          format: int32
+          description: The HTTP status code generated by the origin server
+          example: 400
+        detail:
+          type: string
+          description: A human-readable explanation specific to this occurrence of the problem
+          example: "Invalid query parameter 'productId'"
+        instance:
+          type: string
+          format: uri
+          description: A URI reference that identifies the specific occurrence of the problem
+          example: "/api/v1/prices"
