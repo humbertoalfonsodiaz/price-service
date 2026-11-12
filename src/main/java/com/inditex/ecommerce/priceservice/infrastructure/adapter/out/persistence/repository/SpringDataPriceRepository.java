@@ -26,8 +26,17 @@ public interface SpringDataPriceRepository extends JpaRepository<PriceJpaEntity,
             @Param("productId") Long productId,
             @Param("applicationDate") LocalDateTime applicationDate);
 
-    default Optional<PriceJpaEntity> findFirstApplicablePrice(Long brandId, Long productId, LocalDateTime applicationDate) {
-        List<PriceJpaEntity> results = findAllApplicablePrices(brandId, productId, applicationDate);
-        return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
-    }
+    @Query("""
+        SELECT p FROM PriceJpaEntity p
+        WHERE p.brandId = :brandId
+          AND p.productId = :productId
+          AND :applicationDate >= p.startDate
+          AND :applicationDate <= p.endDate
+        ORDER BY p.priority DESC
+        FETCH FIRST 1 ROW ONLY
+    """)
+    Optional<PriceJpaEntity> findFirstApplicablePrice(
+            @Param("brandId") Long brandId,
+            @Param("productId") Long productId,
+            @Param("applicationDate") LocalDateTime applicationDate);
 }

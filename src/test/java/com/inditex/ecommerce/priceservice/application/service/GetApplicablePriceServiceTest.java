@@ -21,12 +21,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -48,8 +47,8 @@ class GetApplicablePriceServiceTest {
     }
 
     @Test
-    @DisplayName("Should return price when repository port finds applicable price directly")
-    void shouldReturnPriceWhenDirectlyFound() {
+    @DisplayName("Should return price when repository port finds a single applicable price")
+    void shouldReturnPriceWhenSingleCandidateFound() {
         Price expectedPrice = new Price(
                 1L,
                 brandId,
@@ -60,18 +59,19 @@ class GetApplicablePriceServiceTest {
                 Money.of(35.50, "EUR")
         );
 
-        when(priceRepositoryPort.findApplicablePrice(brandId, productId, date))
-                .thenReturn(Optional.of(expectedPrice));
+        when(priceRepositoryPort.findAllApplicablePrices(brandId, productId, date))
+                .thenReturn(List.of(expectedPrice));
 
         Price result = useCase.execute(new GetApplicablePriceQuery(brandId, productId, date));
 
         assertThat(result).isEqualTo(expectedPrice);
-        verify(priceRepositoryPort).findApplicablePrice(brandId, productId, date);
+        verify(priceRepositoryPort).findAllApplicablePrices(brandId, productId, date);
+        verifyNoMoreInteractions(priceRepositoryPort);
     }
 
     @Test
-    @DisplayName("Should fallback to disambiguator when direct find is empty but candidate list has matches")
-    void shouldFallbackToDisambiguator() {
+    @DisplayName("Should select highest priority tariff when candidate list has overlapping matches")
+    void shouldDisambiguateOverlappingCandidatesByHighestPriority() {
         Price price1 = new Price(
                 1L,
                 brandId,
@@ -92,22 +92,25 @@ class GetApplicablePriceServiceTest {
                 Money.of(25.45, "EUR")
         );
 
-        when(priceRepositoryPort.findApplicablePrice(brandId, productId, date)).thenReturn(Optional.empty());
         when(priceRepositoryPort.findAllApplicablePrices(brandId, productId, date)).thenReturn(List.of(price1, price2));
 
         Price result = useCase.execute(new GetApplicablePriceQuery(brandId, productId, date));
 
         assertThat(result).isEqualTo(price2);
+        verify(priceRepositoryPort).findAllApplicablePrices(brandId, productId, date);
+        verifyNoMoreInteractions(priceRepositoryPort);
     }
 
     @Test
-    @DisplayName("Should throw PriceNotFoundException when no prices are found anywhere")
+    @DisplayName("Should throw PriceNotFoundException with a single repository lookup when no prices are found")
     void shouldThrowPriceNotFoundExceptionWhenNotFound() {
-        when(priceRepositoryPort.findApplicablePrice(brandId, productId, date)).thenReturn(Optional.empty());
         when(priceRepositoryPort.findAllApplicablePrices(brandId, productId, date)).thenReturn(Collections.emptyList());
 
         assertThatThrownBy(() -> useCase.execute(new GetApplicablePriceQuery(brandId, productId, date)))
                 .isInstanceOf(PriceNotFoundException.class)
                 .hasMessageContaining("No applicable price found");
+
+        verify(priceRepositoryPort).findAllApplicablePrices(brandId, productId, date);
+        verifyNoMoreInteractions(priceRepositoryPort);
     }
 }

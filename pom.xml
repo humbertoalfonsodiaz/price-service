@@ -13,7 +13,7 @@
 
     <groupId>com.inditex.ecommerce</groupId>
     <artifactId>price-service</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.1</version>
     <name>price-service</name>
     <description>Inditex E-Commerce Price Query Microservice (Hexagonal Architecture + DDD + API-First)</description>
 
